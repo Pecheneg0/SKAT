@@ -20,13 +20,13 @@ from PIL import Image
 from pymavlink import mavutil
 
 # === КОНФИГУРАЦИЯ ===
-VIDEO_PATH = "/home/user/test_videos/flight_test.mp4"  # Путь к вашему видео
-MAVLINK_PORT = "udp:14550"  # Порт для подключения к SITL (или tcp:127.0.0.1:5762)
+VIDEO_PATH = "flight_test.mp4"  # Путь к вашему видео
+MAVLINK_PORT = "udpin:14551"  # Порт для подключения к SITL (или tcp:127.0.0.1:5762)
 MAVLINK_BAUD = 57600
 
-MODEL_PATH = "ALM_best.pth"
+MODEL_PATH = "ALM_best (1).pth"
 LABELS_PATH = "labels.txt"
-CSV_OUTPUT_PATH = "/home/user/test_results.csv"
+CSV_OUTPUT_PATH = "/home/skatwsl/test/test_results.csv"
 
 CONFIDENCE_THRESHOLD = 0.7
 PIXELS_PER_METER = 44.482
@@ -51,12 +51,18 @@ class LetterDetectorTest:
         self.transform = None
         self.letter_stats = {}
         self.last_save_time = 0
-        
+    
+    def bar_alt(self):
+    
+        msg = self.master.recv_match(type="GLOBAL_POSITION_INT", blocking=True)
+        return msg.relative_alt / 1000
+
+
     def connect_to_sitl(self):
         """Подключение к симулятору SITL"""
         logging.info(f"Подключение к SITL: {MAVLINK_PORT}")
         try:
-            self.master = mavutil.mavlink_connection(MAVLINK_PORT, baud=MAVLINK_BAUD)
+            self.master = mavutil.mavlink_connection("udpin:127.0.0.1:14551")
             self.master.wait_heartbeat()
             logging.info("Подключение к SITL успешно!")
             return True
@@ -72,7 +78,7 @@ class LetterDetectorTest:
             from modelold import ArmenianLetterNet
             
             self.model = ArmenianLetterNet()
-            self.model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu')))
+            self.model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu'), weights_only=False))
             self.model.eval()
             
             with open(LABELS_PATH, "r", encoding="utf-8") as f:
@@ -96,14 +102,14 @@ class LetterDetectorTest:
             return 55.754066, 37.617498, 30.0, 30.0, 0.0  # Дефолтные координаты (Москва)
         
         try:
-            msg = self.master.recv_match(type='GLOBAL_POSITION_INT', blocking=False)
+            msg = self.master.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
             if msg:
                 lat = msg.lat / 1e7
                 lon = msg.lon / 1e7
                 alt_agl = msg.relative_alt / 1e3
                 alt_amsl = msg.alt / 1e3
                 
-                msg_att = self.master.recv_match(type='ATTITUDE', blocking=False)
+                msg_att = self.master.recv_match(type='ATTITUDE', blocking=True)
                 yaw = math.degrees(msg_att.yaw) if msg_att else 0.0
                 
                 return lat, lon, alt_agl, alt_amsl, yaw
@@ -309,13 +315,13 @@ class LetterDetectorTest:
         
         try:
             while True:
-                ret, frame = self.get_frame()
+                ret, frame = cap.read()
                 if not ret:
                     break
                 
                 frame_count += 1
-                if frame_count % 10 != 0:  # Пропускаем кадры для скорости
-                    continue
+               # if frame_count % 10 != 0:  # Пропускаем кадры для скорости
+                #    continue
                 
                 # Телеметрия
                 lat, lon, alt_agl, alt_amsl, yaw = self.get_telemetry()
