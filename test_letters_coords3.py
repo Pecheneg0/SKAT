@@ -25,7 +25,7 @@ VIDEO_PATH = "flight_test.mp4"           # Путь к видео для тес�
 MAVLINK_PORT = "udpin:127.0.0.1:14551"   # SITL: udpin для приёма телеметрии
 MAVLINK_BAUD = 57600
 
-MODEL_PATH = "ALM_best.pth"
+MODEL_PATH = "ALM_best (1).pth"
 LABELS_PATH = "labels.txt"
 CSV_OUTPUT_PATH = "/home/skatwsl/test/objects-coordinates.csv"
 
@@ -50,12 +50,14 @@ os.makedirs(LOG_DIR, exist_ok=True)
 
 # Логирование
 logging.basicConfig(
-    filename=os.path.join(LOG_DIR, "test_letters_dinam.log"),
+   # filename=os.path.join(LOG_DIR, "test_letters_dinam.log"),
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-
+    handlers = [
+        logging.FileHandler(os.path.join(LOG_DIR, "test_letters_dinam.log"), encoding = 'utf-8'),
+        logging.StreamHandler(sys.stdout)
+        ]
+    )
 # === ГЛОБАЛЬНЫЕ ФЛАГИ (эмуляция состояния контроллера) ===
 class TestState:
     current_mode = 1  # MODE_LETTERS
@@ -272,7 +274,8 @@ def process_letters_dinam(cap, master, model, labels, transform):
     send_ssh_message("=== Активирован режим распознавания букв ===")
     state.last_processing_time = time.time()
     state.last_save_time = time.time()
-    
+    consecutive_empty_frames = 0
+    MAX_EMPTY_FRAMES = 30
     try:
         while state.current_mode == 1:  # MODE_LETTERS
             new_mode = check_mode()
@@ -289,8 +292,12 @@ def process_letters_dinam(cap, master, model, labels, transform):
             frame = get_frame(cap)
             if frame is None:
                 time.sleep(0.1)
+                consecutive_empty_frames +=1
                 send_ssh_message("Кадр не получен")
                 continue
+            if consecutive_empty_frames >= MAX_EMPTY_FRAMES:
+                print ('Final')
+                break
             
             results, thresh_color = process_frame(frame, *get_coordinates(master))
             letter_detected = False
