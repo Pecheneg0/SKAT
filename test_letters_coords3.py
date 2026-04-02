@@ -294,11 +294,11 @@ def process_letters_dinam(cap, master, model, labels, transform):
                 time.sleep(0.1)
                 consecutive_empty_frames +=1
                 send_ssh_message("Кадр не получен")
+                if consecutive_empty_frames >= MAX_EMPTY_FRAMES:
+                    print ('Final')
+                    break
                 continue
-            if consecutive_empty_frames >= MAX_EMPTY_FRAMES:
-                print ('Final')
-                break
-            
+
             results, thresh_color = process_frame(frame, *get_coordinates(master))
             letter_detected = False
 
